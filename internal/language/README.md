@@ -4,8 +4,7 @@ A simple functional language.
 
 TODO:
 
-- Don't import the same file twice.
-- What if a value from an imported file gets overwritten in the global environment. Shouldn't each file have its own environment which includes the items specified in the import statement as well as the ones created in the file and nothing more.
+- What if a value from an imported file gets overwritten in the global environment. Shouldn't each file have its own environment which includes the items specified in the import statement as well as the ones created in the file and nothing more. Except that we don't want to import the same file twice so these references should be re-used in multiple environments.
 - Add distinction between functions and procedures. Procedures have side effects and are called in place. Whereas functions should only be evaluated when their value is used.
 - Add an optimise step for after the parser that removes dead code.
 - Add a step that can be ran after the parser that checks if the program is valid.
