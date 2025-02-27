@@ -19,7 +19,7 @@ TODO:
 
 ```
 [define calc-fib
-  [function
+  [function int / returns an integer.
     [int n
       [greater n 0] / if n is 0 or lower then this function should not match and an overload ought to be specified.
     ]
@@ -27,12 +27,12 @@ TODO:
       [0 0]
       [1 1]
       [_
-        [int-add
+        [add
           [calc-fib
-            [int-subtract n 1]
+            [subtract n 1]
           ]
           [calc-fib
-            [int-subtract n 2]
+            [subtract n 2]
           ]
         ]
       ]
