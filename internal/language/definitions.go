@@ -28,11 +28,10 @@ const (
 	String
 )
 
-type LazyValue struct {
+type LazyData struct {
 	Expression  Value
 	Value       Value
 	Environment *Environment
-	Evaluated   bool
 }
 
 // OptionValue represents an optional value. Instead of using null, we wrap values in an Option.
