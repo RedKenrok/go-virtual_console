@@ -20,15 +20,15 @@ func AddBuiltins(
 			if len(args) != 2 {
 				return Value{}, errors.New("define requires 2 arguments")
 			}
-			symVal := args[0]
-			if symVal.Type != Symbol {
+			symbolValue := args[0]
+			if symbolValue.Type != Symbol {
 				return Value{}, errors.New("first argument to define must be a symbol")
 			}
 			result, err := Evaluate(args[1], env)
 			if err != nil {
 				return Value{}, err
 			}
-			env.Set(symVal.Data.(string), result)
+			env.Set(symbolValue.Data.(string), result)
 			return result, nil
 		},
 	})
@@ -62,23 +62,32 @@ func AddBuiltins(
 
 			function := func(
 				callArgs []Value,
-				_ *Environment,
+				callEnv *Environment,
 			) (Value, error) {
 				if len(callArgs) != len(parameters) {
 					return Value{}, errors.New("incorrect number of arguments")
 				}
-				newEnv := NewEnv(env)
+				innerEnv := NewEnv(env)
 				for index, parameter := range parameters {
-					// Bind a lazy thunk instead of the raw argument.
-					newEnv.Set(parameter, Value{
-						Type: Lazy,
-						Data: LazyValue{
-							Expression:  callArgs[index],
-							Environment: env,
-						},
-					})
+					if callArgs[index].Type == List {
+						innerEnv.Set(parameter, Value{
+							Type: Lazy,
+							Data: LazyData{
+								Expression:  callArgs[index],
+								Environment: callEnv,
+							},
+						})
+					} else {
+						innerEnv.Set(parameter, callArgs[index])
+					}
 				}
-				return Evaluate(body, newEnv)
+				return Value{
+					Type: Lazy,
+					Data: LazyData{
+						Expression:  body,
+						Environment: innerEnv,
+					},
+				}, nil
 			}
 			return Value{
 				Type: Function,
@@ -116,16 +125,23 @@ func AddBuiltins(
 
 			procedure := func(
 				callArgs []Value,
-				_ *Environment,
+				callEnv *Environment,
 			) (Value, error) {
 				if len(callArgs) != len(parameters) {
 					return Value{}, errors.New("incorrect number of arguments")
 				}
-				newEnv := NewEnv(env)
+				innerEnv := NewEnv(env)
 				for index, parameter := range parameters {
-					newEnv.Set(parameter, callArgs[index])
+					callArg, err := EvaluateUntilConcrete(
+						callArgs[index],
+						callEnv,
+					)
+					if err != nil {
+						return Value{}, err
+					}
+					innerEnv.Set(parameter, callArg)
 				}
-				return Evaluate(body, newEnv)
+				return Evaluate(body, innerEnv)
 			}
 
 			return Value{
@@ -148,7 +164,7 @@ func AddBuiltins(
 			if len(args) != 2 && len(args) != 3 {
 				return Value{}, errors.New("if requires 2 or 3 arguments")
 			}
-			condition, err := Evaluate(args[0], env)
+			condition, err := EvaluateUntilConcrete(args[0], env)
 			if err != nil {
 				return Value{}, err
 			}
@@ -164,7 +180,7 @@ func AddBuiltins(
 					},
 				}
 			}
-			// Only an Option with Some == false is considered false.
+			// Only a bool or Option with Some == false is considered false.
 			if (condition.Type == Bool && !condition.Data.(bool)) || (condition.Type == Option && !condition.Data.(OptionValue).Some) {
 				return Evaluate(elseExpression, env)
 			}
@@ -185,10 +201,11 @@ func AddBuiltins(
 			if len(args) < 2 {
 				return Value{}, errors.New("match requires an expression and at least one clause")
 			}
-			matchVal, err := Evaluate(args[0], env)
+			matchValue, err := EvaluateUntilConcrete(args[0], env)
 			if err != nil {
 				return Value{}, err
 			}
+
 			var wildcard Value
 			for i := 1; i < len(args); i++ {
 				clause := args[i]
@@ -212,7 +229,7 @@ func AddBuiltins(
 				if err != nil {
 					return Value{}, err
 				}
-				if valueEqual(matchVal, patternValue) {
+				if valueEqual(matchValue, patternValue, env) {
 					return Evaluate(resultExpression, env)
 				}
 			}

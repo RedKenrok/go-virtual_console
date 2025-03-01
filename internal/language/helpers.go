@@ -2,60 +2,100 @@ package language
 
 import "fmt"
 
-// toString returns a string representation of a Value.
-func toString(
+// typeToString returns a string representation of a Type.
+func typeToString(
+	t ValueType,
+) string {
+	switch t {
+	case Bool:
+		return "bool"
+	case Float:
+		return "float"
+	case Function:
+		return "function"
+	case Int:
+		return "int"
+	case Lazy:
+		return "lazy"
+	case List:
+		return "list"
+	case Option:
+		return "option"
+	case Procedure:
+		return "procedure"
+	case String:
+		return "string"
+	case Symbol:
+		return "symbol"
+	}
+	return "unknown"
+}
+
+// valueToString returns a string representation of a Value.
+func valueToString(
 	value Value,
 ) string {
 	switch value.Type {
 	case Bool:
 		if value.Data.(bool) {
-			return "true"
+			return "bool<true>"
 		}
-		return "false"
+		return "bool<false>"
 
 	case Float:
-		return fmt.Sprintf("%g", value.Data.(float64))
+		return fmt.Sprintf("float<%g>", value.Data.(float64))
 
 	case Function:
-		return "<function>"
+		return "function<>"
 
 	case Int:
-		return fmt.Sprintf("%d", value.Data.(int64))
+		return fmt.Sprintf("int<%d>", value.Data.(int64))
 
 	case Lazy:
-		return "lazy " + toString(value.Data.(LazyData).Expression)
+		return "lazy<" + valueToString(value.Data.(LazyData).Expression) + ">" + environmentToString(value.Data.(LazyData).Environment)
 
 	case List:
 		list := value.Data.([]Value)
-		result := STR_LIST_START
+		result := "list<"
 		for i, elem := range list {
 			if i > 0 {
 				result += " "
 			}
-			result += toString(elem)
+			result += valueToString(elem)
 		}
-		result += STR_LIST_END
-		return result
+		return result + ">"
 
 	case Option:
 		option := value.Data.(OptionValue)
 		if option.Some {
-			return "some " + toString(option.Value)
+			return "some<" + valueToString(option.Value) + ">"
 		}
-		return "none"
+		return "none<>"
 
 	case Procedure:
-		return "<procedure>"
+		return "procedure<>"
 
 	case String:
-		return STR_STRING + value.Data.(string) + STR_STRING
+		return "string<" + value.Data.(string) + ">"
 
 	case Symbol:
-		return value.Data.(string)
+		return "symbol<" + value.Data.(string) + ">"
 
 	default:
-		return "unknown"
+		return "unknown<>"
 	}
+}
+
+// environmentToString returns a string representation of an Environment.
+func environmentToString(
+	env *Environment,
+) string {
+	result := "{"
+	for key, value := range env.Values {
+		result += key + ": " + valueToString(value) + ", "
+	}
+	result += "}"
+	return result
 }
 
 // valueEqual compares two Values for equality (with a little leniency for numbers).
@@ -132,4 +172,32 @@ func valueEqual(
 		}
 	}
 	return false
+}
+
+func printEvaluation(
+	message string,
+	value Value,
+	env *Environment,
+) {
+	spaces := ""
+	for i := 0; i < evalDepth; i++ {
+		spaces += "  "
+	}
+	println(spaces+message, valueToString(value), environmentToString(env))
+}
+
+func printKeyValue(
+	message string,
+	key string,
+	value *Value,
+) {
+	spaces := ""
+	for i := 0; i < evalDepth; i++ {
+		spaces += "  "
+	}
+	if value == nil {
+		println(spaces+message, key)
+	} else {
+		println(spaces+message, key, valueToString(*value))
+	}
 }

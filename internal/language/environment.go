@@ -33,7 +33,7 @@ func (
 	if e.Outer != nil {
 		return e.Outer.Get(key)
 	}
-	return Value{}, errors.New("undefined symbol: " + key)
+	return Value{}, errors.New("undefined symbol '" + key + "'")
 }
 
 // Set assigns a value to a symbol in the environment.

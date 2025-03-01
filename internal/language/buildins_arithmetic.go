@@ -15,7 +15,7 @@ var addInts = Value{
 	) {
 		var sumInt int64 = 0
 		for _, arg := range args {
-			evaluatedArg, err := Evaluate(arg, env)
+			evaluatedArg, err := EvaluateUntilConcrete(arg, env)
 			if err != nil {
 				return Value{}, err
 			}
@@ -42,7 +42,7 @@ var subtractInts = Value{
 	) {
 		var resultInt int64 = 0
 		for i, arg := range args {
-			evaluatedArg, err := Evaluate(arg, env)
+			evaluatedArg, err := EvaluateUntilConcrete(arg, env)
 			if err != nil {
 				return Value{}, err
 			}

@@ -4,41 +4,53 @@ import (
 	"errors"
 )
 
+var evalDepth = 0
+
 // Evaluate evaluates an expression within a given environment.
 func Evaluate(
 	expression Value,
 	env *Environment,
 ) (Value, error) {
-	switch expression.Type {
-	case Symbol:
-		return env.Get(expression.Data.(string))
+	evalDepth++
+	defer func() {
+		evalDepth--
+	}()
 
-	case Bool, Int, Float, String, Option:
+	if evalDepth > 1e9 {
+		return Value{}, errors.New("maximum evaluation depth exceeded")
+	}
+
+	switch expression.Type {
+	case Bool, Float, Int, Option, String:
 		return expression, nil
 
 	case Lazy:
-		thunk := expression.Data.(LazyValue)
-		if !thunk.Evaluated {
-			value, err := Evaluate(
-				thunk.Expression,
-				thunk.Environment,
-			)
-			if err != nil {
-				return Value{}, err
-			}
-			thunk.Value = value
-			thunk.Evaluated = true
-			// Update the thunk so future accesses are fast.
-			expression.Data = thunk
+		thunk := expression.Data.(LazyData)
+		value, err := Evaluate(
+			thunk.Expression,
+			thunk.Environment,
+		)
+		if err != nil {
+			return Value{}, err
 		}
-		return expression.Data.(LazyValue).Value, nil
+		expression.Type = value.Type
+		expression.Data = value.Data
+		return expression, nil
 
 	case List:
 		list := expression.Data.([]Value)
 		if len(list) == 0 {
-			return expression, nil
+			return Value{
+				Type: Option,
+				Data: OptionValue{
+					Some: false,
+				},
+			}, nil
 		}
-		value, err := Evaluate(list[0], env)
+		value, err := Evaluate(
+			list[0],
+			env,
+		)
 		if err != nil {
 			return Value{}, err
 		}
@@ -47,30 +59,32 @@ func Evaluate(
 			return Value{}, errors.New("first element in list is not a function or procedure")
 		}
 
-		if value.Type == Function {
-			// Lazily evaluate arguments.
-			if function, ok := value.Data.(func([]Value, *Environment) (Value, error)); ok {
-				return function(list[1:], env)
-			}
-			return Value{}, errors.New("function is not callable")
+		if function, ok := value.Data.(func([]Value, *Environment) (Value, error)); ok {
+			return function(list[1:], env)
 		}
-		// Type must be a procedure.
+		return Value{}, errors.New("function or procedure is not callable")
 
-		// Eagerly evaluate arguments.
-		var evaluatedArgs []Value
-		for _, arg := range list[1:] {
-			evaluatedArg, err := Evaluate(arg, env)
-			if err != nil {
-				return Value{}, err
-			}
-			evaluatedArgs = append(evaluatedArgs, evaluatedArg)
-		}
-		if procedure, ok := value.Data.(func([]Value, *Environment) (Value, error)); ok {
-			return procedure(evaluatedArgs, env)
-		}
-		return Value{}, errors.New("procedure is not callable")
-
-	default:
-		return expression, nil
+	case Symbol:
+		return env.Get(expression.Data.(string))
 	}
+
+	return Value{}, errors.New("unknown expression type")
+}
+
+func EvaluateUntilConcrete(
+	expression Value,
+	env *Environment,
+) (Value, error) {
+	value, err := Evaluate(expression, env)
+
+	if err != nil {
+		return Value{}, err
+	}
+	for value.Type == Lazy || value.Type == List {
+		value, err = Evaluate(value, env)
+		if err != nil {
+			return Value{}, err
+		}
+	}
+	return value, nil
 }

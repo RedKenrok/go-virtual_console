@@ -35,6 +35,6 @@ func Repl() {
 			fmt.Println("Eval error:", err)
 			continue
 		}
-		fmt.Println("Result:", toString(result))
+		fmt.Println("Result:", valueToString(result))
 	}
 }
